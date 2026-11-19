@@ -14,3 +14,6 @@ Uses Ionicons 8.1.0 glyphs from the exact demo dependency version, not Apple SF 
 
 ## 0.4
 White glyphs in both themes; dark charcoal cards; lighter typography on themed text; compact rows. Animated airplane switch follows actual observed state. Spring-like touch feedback on homepage controls. Search uses a sampled scroll-content backdrop at up to 30 updates/sec, AGSL blur/refraction at edges on API 33+ hardware canvas, and an opaque fallback if unsupported. No exact Apple optical or frame-rate claim. No submenu transition replacement. Device testing required.
+
+## 0.5
+Ported capsule refraction math from Kyant AndroidLiquidGlass 2.0.1 (Apache-2.0), adapted to native RenderNode and RuntimeShader. Live backdrop sampled from actual scroll content with padding, blur and optical distortion; touch highlight and spring release, animated confirmed-state switch. Custom screenshot-derived glyphs replace multiple mismatches. Local SF Pro support: reads named fonts from Settings private files/isettings-fonts or system/product fonts if already readable; no proprietary font files shipped. Defaults to Android sans-serif otherwise. No exact iOS icon/font claim. Hardware runtime and navigation tests still needed.

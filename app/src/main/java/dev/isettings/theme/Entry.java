@@ -3,6 +3,8 @@ package dev.isettings.theme;
 import android.app.Activity;
 import android.animation.ValueAnimator;
 import android.animation.ArgbEvaluator;
+import android.view.animation.PathInterpolator;
+import java.io.File;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.content.*;
@@ -91,7 +93,7 @@ public final class Entry implements IXposedHookLoadPackage {
    row(g,"Mobile Service","signal",0xff6fdc83,0xff3ec75d,"",()->action(Settings.ACTION_DATA_ROAMING_SETTINGS),false);
    row(g,"Personal Hotspot","link",0xff6fdc83,0xff3ec75d,"",()->action("android.settings.TETHER_SETTINGS"),false);
    pref(g,"top_level_battery","Battery","battery",0xff6fdc83,0xff3ec75d);gap(32);
-   g=group();pref(g,"top_level_general","General","gear",0xffa9a9ae,0xff83838a);pref(g,"top_level_accessibility","Accessibility","access",0xff489bfd,0xff2b77f4);pref(g,"top_level_advanced_features",null,"spark",0xff489bfd,0xff2b77f4);pref(g,"top_level_galaxy_ai",null,"spark",0xffc4a0ff,0xff8073e8);pref(g,"top_level_display",null,"sun",0xff489bfd,0xff2b77f4);pref(g,"top_level_sounds",null,"sound",0xffff7b91,0xffeb3d62);pref(g,"top_level_notifications",null,"bell",0xffff7b91,0xffeb3d62);pref(g,"top_level_wallpaper",null,"image",0xff489bfd,0xff2b77f4);pref(g,"top_level_homescreen",null,"grid",0xff489bfd,0xff2b77f4);pref(g,"top_level_lockscreen",null,"lock",0xff9b9de8,0xff696bd3);gap(32);
+   g=group();pref(g,"top_level_general","General","gear",0xffa9a9ae,0xff83838a);pref(g,"top_level_accessibility","Accessibility","access",0xff489bfd,0xff2b77f4);pref(g,"top_level_advanced_features",null,"action",0xff489bfd,0xff2b77f4);pref(g,"top_level_galaxy_ai",null,"ai",0xffc4a0ff,0xff8073e8);pref(g,"top_level_display",null,"sun",0xff489bfd,0xff2b77f4);pref(g,"top_level_sounds",null,"sound",0xffff7b91,0xffeb3d62);pref(g,"top_level_notifications",null,"bell",0xffff7b91,0xffeb3d62);pref(g,"top_level_wallpaper",null,"image",0xff489bfd,0xff2b77f4);pref(g,"top_level_homescreen",null,"grid",0xff489bfd,0xff2b77f4);pref(g,"top_level_lockscreen",null,"lock",0xff9b9de8,0xff696bd3);gap(32);
    g=group();for(Map.Entry<String,Object> e:prefs.entrySet())if(!used.contains(e.getKey())){Object p=e.getValue();String n=value(p,"getTitle");if(!n.isEmpty()){String kind=category(e.getKey(),n);int[] colors=palette(kind);row(g,n,kind,colors[0],colors[1],"",()->openPref(p),false);}}
    if(g.getChildCount()==0)content.removeView(g);
    gap(16);TextView original=text("Original Samsung Settings",15,0xff2b77f4,false);original.setGravity(Gravity.CENTER);content.addView(original,new LinearLayout.LayoutParams(-1,dp(48)));original.setOnClickListener(v->nativePage());
@@ -109,15 +111,15 @@ public final class Entry implements IXposedHookLoadPackage {
    try{airplaneObserver=new ContentObserver(handler){@Override public void onChange(boolean self){refreshAirplane();}};a.getContentResolver().registerContentObserver(Settings.Global.getUriFor(Settings.Global.AIRPLANE_MODE_ON),false,airplaneObserver);}catch(Throwable e){log("observer "+e);}
   }
   void interactive(View v,Runnable click){
-   v.setOnTouchListener((view,event)->{if(!ValueAnimator.areAnimatorsEnabled())return false;switch(event.getActionMasked()){case MotionEvent.ACTION_DOWN:view.animate().cancel();view.animate().scaleX(.975f).scaleY(.955f).alpha(.88f).setInterpolator(new DecelerateInterpolator()).setDuration(100).start();break;case MotionEvent.ACTION_UP:case MotionEvent.ACTION_CANCEL:view.animate().cancel();view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(310).setInterpolator(new OvershootInterpolator(1.25f)).start();break;}return false;});
-   v.setOnClickListener(view->{try{if(mountedNow&&!navigating)click.run();}catch(Throwable e){error(e);}});
+   v.setOnTouchListener((view,event)->{if(!ValueAnimator.areAnimatorsEnabled())return false;switch(event.getActionMasked()){case MotionEvent.ACTION_DOWN:view.animate().cancel();if(view instanceof FrameLayout&&glassView!=null)glassView.press(true,event.getX(),event.getY());if(airplaneGlyph!=null&&airplaneGlyph.getParent()==view)airplaneGlyph.press(true);view.animate().scaleX(.985f).scaleY(.97f).alpha(.98f).setInterpolator(new DecelerateInterpolator()).setDuration(110).start();break;case MotionEvent.ACTION_UP:case MotionEvent.ACTION_CANCEL:view.animate().cancel();if(view instanceof FrameLayout&&glassView!=null)glassView.press(false,event.getX(),event.getY());if(airplaneGlyph!=null&&airplaneGlyph.getParent()==view)airplaneGlyph.press(false);view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(340).setInterpolator(new OvershootInterpolator(1.25f)).start();break;}return false;});
+   v.setOnClickListener(view->{if(!mountedNow||navigating)return;boolean toggle=airplaneGlyph!=null&&airplaneGlyph.getParent()==view; if(toggle||!ValueAnimator.areAnimatorsEnabled()){try{click.run();}catch(Throwable e){error(e);}return;}navigating=true;handler.postDelayed(()->{navigating=false;if(mountedNow)try{click.run();}catch(Throwable e){error(e);}},view instanceof FrameLayout?210:125);});
   }
   String category(String key,String name){String k=(key+" "+name).toLowerCase(Locale.ROOT);if(k.contains("warranty"))return "shield";if(k.contains("connect"))return k.contains("device")?"devices":"wifi";if(k.contains("routine")||k.contains("mode"))return "moon";if(k.contains("theme"))return "palette";if(k.contains("privacy")||k.contains("security"))return "shield";if(k.contains("location"))return "location";if(k.contains("emergency")||k.contains("safety"))return "medical";if(k.contains("account")||k.contains("backup"))return "people";if(k.contains("google"))return "google";if(k.contains("wellbeing")||k.contains("well_being"))return "heart";if(k.contains("parent"))return "family";if(k.contains("device care")||k.contains("device_care")||k.contains("devicecare"))return "speed";if(k.contains("apps")||k.contains("application"))return "apps";if(k.contains("update"))return "update";if(k.contains("guide")||k.contains("manual"))return "help";if(k.contains("about"))return "info";if(k.contains("developer"))return "code";return "options";}
   int[] palette(String k){switch(k){case "heart":case "medical":return new int[]{0xffff778a,0xffed4362};case "shield":case "family":case "speed":return new int[]{0xff6fdc83,0xff3ec75d};case "moon":case "palette":return new int[]{0xffaa92fa,0xff7b65de};case "options":case "code":case "info":return new int[]{0xffa9a9ae,0xff83838a};default:return new int[]{0xff489bfd,0xff2b77f4};}}
   void pref(LinearLayout g,String key,String alias,String kind,int hi,int lo){Object p=prefs.get(key);if(p==null)return;used.add(key);row(g,alias==null?value(p,"getTitle"):alias,kind,hi,lo,"",()->openPref(p),false);}
   void row(LinearLayout g,String name,String kind,int hi,int lo,String status,Runnable click,boolean toggle){
    if(g.getChildCount()>0){View v=new View(a);v.setBackgroundColor(line);LinearLayout.LayoutParams l=new LinearLayout.LayoutParams(-1,Math.max(1,dp(.5f)));l.setMargins(dp(60),0,dp(16),0);g.addView(v,l);}
-   LinearLayout r=new LinearLayout(a);r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(dp(16),0,dp(16),0);r.addView(new Glyph(a,kind,hi,lo,true,dark),new LinearLayout.LayoutParams(dp(26),dp(26)));TextView label=text(name,16,fg,false);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams l=new LinearLayout.LayoutParams(0,-2,1);l.leftMargin=dp(13);r.addView(label,l);
+   LinearLayout r=new LinearLayout(a);r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(dp(16),0,dp(16),0);r.addView(new Glyph(a,kind,hi,lo,true,dark),new LinearLayout.LayoutParams(dp(27),dp(27)));TextView label=text(name,16,fg,false);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams l=new LinearLayout.LayoutParams(0,-2,1);l.leftMargin=dp(13);r.addView(label,l);
    if(toggle){airplaneGlyph=new Glyph(a,"switch",0,0,false,dark);airplaneGlyph.setOn(isAirplane(),false);r.addView(airplaneGlyph,new LinearLayout.LayoutParams(dp(56),dp(26)));r.setContentDescription("Airplane Mode, "+(airplaneGlyph.on?"on":"off"));}
    else{if(!status.isEmpty()){TextView note=text(status,16,sub,false);note.setSingleLine(true);note.setMaxWidth(dp(105));note.setEllipsize(android.text.TextUtils.TruncateAt.END);r.addView(note);}r.addView(new Glyph(a,"chevron",sub,sub,false,dark),new LinearLayout.LayoutParams(dp(17),dp(22)));}
    g.addView(r,new LinearLayout.LayoutParams(-1,dp(47)));interactive(r,click);r.setFocusable(true);
@@ -135,49 +137,87 @@ public final class Entry implements IXposedHookLoadPackage {
   void remove(){mountedNow=false;if(glassView!=null)glassView.stop();if(airplaneGlyph!=null)airplaneGlyph.stop();handler.removeCallbacksAndMessages(null);if(airplaneObserver!=null){try{a.getContentResolver().unregisterContentObserver(airplaneObserver);}catch(Throwable ignored){}airplaneObserver=null;}if(layer.getParent()==root)root.removeView(layer);for(Map.Entry<View,Integer> v:importance.entrySet())v.getKey().setImportantForAccessibility(v.getValue());importance.clear();}
   static View findSearch(View v){String id="";try{if(v.getId()!=View.NO_ID)id=v.getResources().getResourceEntryName(v.getId()).toLowerCase(Locale.ROOT);}catch(Throwable ignored){}if(v.isShown()&&v.isClickable()&&(id.contains("search")||v.getClass().getName().equals("com.samsung.android.settings.homepage.SearchView")))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View x=findSearch(g.getChildAt(i));if(x!=null)return x;}}return null;}
  }
+ static final class LocalFonts {
+  private static final Map<Integer,Typeface> cache=new HashMap<>();
+  static synchronized Typeface get(Context c,int weight){Typeface hit=cache.get(weight);if(hit!=null)return hit;String style=weight>=600?"Semibold":"Regular";String[] names={"SF-Pro-Text-"+style+".otf","SF-Pro-Display-"+style+".otf","SFUIText-"+style+".otf"};for(String dir:new String[]{new File(c.getFilesDir(),"isettings-fonts").getAbsolutePath(),"/system/fonts","/product/fonts"})for(String name:names)try{File f=new File(dir,name);if(f.isFile()&&f.canRead()){Typeface face=Typeface.createFromFile(f);cache.put(weight,face);return face;}}catch(Throwable ignored){} Typeface face=Typeface.create(Typeface.create("sans-serif",Typeface.NORMAL),weight,false);cache.put(weight,face);return face;}
+ }
  static final class RegularText extends TextView {
   final Typeface chosen;
-  RegularText(Context c,int weight){super(c);chosen=Typeface.create(Typeface.create("sans-serif",Typeface.NORMAL),weight,false);super.setTypeface(chosen);applyWeight();}
+  RegularText(Context c,int weight){super(c);chosen=LocalFonts.get(c,weight);super.setTypeface(chosen);applyWeight();}
   void applyWeight(){if(chosen!=null){getPaint().setTypeface(chosen);getPaint().setFakeBoldText(false);getPaint().setTextSkewX(0);}}
   @Override protected void onMeasure(int w,int h){applyWeight();super.onMeasure(w,h);applyWeight();}
   @Override protected void onDraw(Canvas c){applyWeight();super.onDraw(c);}
  }
+ // Native-view adaptation of the rounded-rectangle refraction and interactive highlight
+ // from AndroidLiquidGlass 2.0.1, Copyright 2025 Kyant, Apache-2.0.
+ // Modified: RenderNode capture, capsule coordinates, material tint, press uniforms.
  static final class LiquidSearch extends View {
-  final View source;final int bg;final boolean dark;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);final int[] src=new int[2],dst=new int[2];Bitmap sample;Canvas sampler;boolean queued=false,stopped=false;long last=0;RuntimeShader shader;
-  final Runnable sampleTask=()->{queued=false;if(stopped||!isAttachedToWindow())return;capture();};
-  LiquidSearch(Context c,View source,int bg,boolean dark){super(c);this.source=source;this.bg=bg;this.dark=dark;setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);if(Build.VERSION.SDK_INT>=33)try{shader=new RuntimeShader(LENS);}catch(Throwable e){log("glass shader fallback "+e);}}
+  final View source;final int bg;final boolean dark;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final int[] src=new int[2],dst=new int[2];
+  final RenderNode node=new RenderNode("iSettings live glass");RuntimeShader shader;RenderEffect blur;boolean stopped=false,ready=false,dirty=true;
+  float progress=0f,touchX=0f,touchY=0f;int padding;ValueAnimator motion;
+  LiquidSearch(Context c,View source,int bg,boolean dark){super(c);this.source=source;this.bg=bg;this.dark=dark;setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);try{if(Build.VERSION.SDK_INT>=33)shader=new RuntimeShader(LENS);}catch(Throwable e){log("glass shader unavailable "+e);}}
   int dp(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
-  void requestSample(){if(stopped||queued)return;queued=true;postDelayed(sampleTask,Math.max(0,33-(SystemClock.uptimeMillis()-last)));}
-  void stop(){stopped=true;removeCallbacks(sampleTask);sample=null;sampler=null;shader=null;}
-  @Override protected void onSizeChanged(int w,int h,int ow,int oh){super.onSizeChanged(w,h,ow,oh);requestSample();}
-  void capture(){int w=getWidth(),h=getHeight();if(w<=0||h<=0||source.getWidth()==0)return;last=SystemClock.uptimeMillis();try{
-    int bw=Math.max(1,(int)(w*.45f)),bh=Math.max(1,(int)(h*.45f));if(sample==null||sample.getWidth()!=bw||sample.getHeight()!=bh){sample=Bitmap.createBitmap(bw,bh,Bitmap.Config.ARGB_8888);sampler=new Canvas(sample);}
-    sample.eraseColor(bg);source.getLocationOnScreen(src);getLocationOnScreen(dst);sampler.save();sampler.scale((float)bw/w,(float)bh/h);sampler.translate(src[0]-dst[0],src[1]-dst[1]);try{source.draw(sampler);}finally{sampler.restore();}invalidate();
-   }catch(Throwable e){sample=null;sampler=null;log("glass capture fallback "+e);}}
-  @Override protected void onDraw(Canvas c){super.onDraw(c);float w=getWidth(),h=getHeight(),r=h*.5f;if(w==0||h==0)return;
-   paint.setStyle(Paint.Style.FILL);paint.setShader(null);
-   if(sample!=null&&shader!=null&&c.isHardwareAccelerated()){try{BitmapShader input=new BitmapShader(sample,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP);shader.setInputShader("backdrop",input);shader.setFloatUniform("size",w,h);shader.setFloatUniform("sampleSize",sample.getWidth(),sample.getHeight());shader.setFloatUniform("isDark",dark?1f:0f);paint.setShader(shader);c.drawRoundRect(0,0,w,h,r,r,paint);paint.setShader(null);}catch(Throwable e){shader=null;paint.setShader(null);}}
-   if(sample==null||shader==null||!c.isHardwareAccelerated()){paint.setColor(dark?0xff38383c:0xffeeeeF2);c.drawRoundRect(0,0,w,h,r,r,paint);}
-   paint.setShader(new LinearGradient(0,0,0,h,new int[]{dark?0x20ffffff:0x77ffffff,0x00ffffff,dark?0x10000000:0x15ffffff},new float[]{0,.45f,1},Shader.TileMode.CLAMP));c.drawRoundRect(0,0,w,h,r,r,paint);paint.setShader(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(1));paint.setShader(new LinearGradient(0,0,w,h,new int[]{dark?0x88ffffff:0xffffffff,0x22ffffff,dark?0x55ffffff:0xccffffff},null,Shader.TileMode.CLAMP));c.drawRoundRect(.8f,.8f,w-.8f,h-.8f,r-.8f,r-.8f,paint);paint.setShader(null);paint.setStyle(Paint.Style.FILL);
+  void requestSample(){if(!stopped){dirty=true;postInvalidateOnAnimation();}}
+  void press(boolean down,float x,float y){touchX=x;touchY=y;if(motion!=null)motion.cancel();if(!ValueAnimator.areAnimatorsEnabled()){progress=down?1f:0f;requestSample();return;}motion=ValueAnimator.ofFloat(progress,down?1f:0f);motion.setDuration(down?210:460);motion.setInterpolator(down?new DecelerateInterpolator():new OvershootInterpolator(.65f));motion.addUpdateListener(v->{progress=(Float)v.getAnimatedValue();postInvalidateOnAnimation();});motion.start();}
+  void stop(){stopped=true;if(motion!=null)motion.cancel();node.discardDisplayList();shader=null;ready=false;}
+  @Override protected void onSizeChanged(int w,int h,int ow,int oh){super.onSizeChanged(w,h,ow,oh);padding=dp(24);ready=false;dirty=true;blur=null;requestSample();}
+  void capture(int w,int h){node.setPosition(0,0,w+2*padding,h+2*padding);RecordingCanvas rec=node.beginRecording();try{rec.drawColor(bg);source.getLocationOnScreen(src);getLocationOnScreen(dst);rec.save();rec.translate(src[0]-dst[0]+padding,src[1]-dst[1]+padding);try{source.draw(rec);}finally{rec.restore();}}finally{node.endRecording();}ready=true;dirty=false;}
+  @Override protected void onDraw(Canvas c){super.onDraw(c);int w=getWidth(),h=getHeight();float r=h*.5f;if(w==0||h==0||stopped)return;float t=Math.max(0f,Math.min(1f,progress));paint.setStyle(Paint.Style.FILL);paint.setShader(null);boolean drawn=false;
+   if(shader!=null&&c.isHardwareAccelerated())try{if(dirty||!ready)capture(w,h);if(blur==null)blur=RenderEffect.createBlurEffect(dp(7),dp(7),Shader.TileMode.CLAMP);
+    shader.setFloatUniform("size",w,h);shader.setFloatUniform("offset",-padding,-padding);shader.setFloatUniform("cornerRadii",r,r,r,r);shader.setFloatUniform("refractionHeight",Math.min(r,dp(13)+t*dp(4)));shader.setFloatUniform("refractionAmount",-dp(18)-t*dp(8));shader.setFloatUniform("depthEffect",.12f);shader.setFloatUniform("isDark",dark?1f:0f);shader.setFloatUniform("press",t);shader.setFloatUniform("touch",touchX,touchY);
+    node.setRenderEffect(RenderEffect.createChainEffect(RenderEffect.createRuntimeShaderEffect(shader,"content"),blur));Path clip=new Path();clip.addRoundRect(0,0,w,h,r,r,Path.Direction.CW);c.save();try{c.clipPath(clip);c.translate(-padding,-padding);c.drawRenderNode(node);drawn=true;}finally{c.restore();}
+   }catch(Throwable e){shader=null;log("glass effect fallback "+e);}
+   if(!drawn){paint.setColor(dark?0xff37373b:0xffeeeeF2);c.drawRoundRect(0,0,w,h,r,r,paint);}
+   paint.setShader(new LinearGradient(0,0,w,h,new int[]{dark?0x88ffffff:0xffffffff,0x12ffffff,dark?0x62ffffff:0xd0ffffff},null,Shader.TileMode.CLAMP));paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(1));c.drawRoundRect(1,1,w-1,h-1,r-1,r-1,paint);paint.setShader(null);paint.setStyle(Paint.Style.FILL);
   }
-  static final String LENS="uniform shader backdrop; uniform float2 size; uniform float2 sampleSize; uniform float isDark;"+
-   "half4 main(float2 p){float2 center=size*0.5; float radius=center.y; float2 q=abs(p-center)-float2(center.x-radius,0.0); float sd=length(max(q,float2(0.0)))+min(max(q.x,q.y),0.0)-radius;"+
-   "float edge=1.0-smoothstep(0.0,radius*0.60,-sd); float2 dir=normalize(p-float2(clamp(p.x,radius,size.x-radius),center.y)+float2(0.0001,0.0001));"+
-   "float2 uv=clamp(p-dir*edge*radius*0.22,float2(0.0),size)*sampleSize/size; float2 d=sampleSize/size*radius*0.15;"+
-   "half4 a=backdrop.eval(uv)*0.28; a+=(backdrop.eval(uv+float2(d.x,0.0))+backdrop.eval(uv-float2(d.x,0.0))+backdrop.eval(uv+float2(0.0,d.y))+backdrop.eval(uv-float2(0.0,d.y)))*0.12;"+
-   "a+=(backdrop.eval(uv+d)+backdrop.eval(uv-d)+backdrop.eval(uv+float2(d.x,-d.y))+backdrop.eval(uv+float2(-d.x,d.y)))*0.06;"+
-   "half lum=dot(a.rgb,half3(0.299,0.587,0.114)); half3 saturated=clamp(mix(half3(lum),a.rgb,1.35),0.0,1.0); half3 tint=mix(half3(0.96,0.96,0.98),half3(0.20,0.20,0.23),isDark);"+
-   "return half4(mix(saturated,tint,mix(0.63,0.45,isDark)),1.0);}";
+  static final String LENS="""
+   uniform shader content;
+   uniform float2 size;
+   uniform float2 offset;
+   uniform float4 cornerRadii;
+   uniform float refractionHeight;
+   uniform float refractionAmount;
+   uniform float depthEffect;
+   uniform float isDark;
+   uniform float press;
+   uniform float2 touch;
+   float radiusAt(float2 coord,float4 radii){if(coord.x>=0.0){return coord.y<=0.0?radii.y:radii.z;}return coord.y<=0.0?radii.x:radii.w;}
+   float sdRoundedRect(float2 coord,float2 halfSize,float radius){float2 q=abs(coord)-(halfSize-float2(radius));return length(max(q,float2(0.0)))-radius+min(max(q.x,q.y),0.0);}
+   float2 gradSdRoundedRect(float2 coord,float2 halfSize,float radius){float2 q=abs(coord)-(halfSize-float2(radius));if(q.x>=0.0||q.y>=0.0)return sign(coord)*normalize(max(q,float2(0.0))+float2(0.00001));float gx=step(q.y,q.x);return sign(coord)*float2(gx,1.0-gx);}
+   float circleMap(float x){return 1.0-sqrt(max(0.0,1.0-x*x));}
+   half4 main(float2 coord){
+     float2 hs=size*0.5;
+     float2 local=coord+offset;
+     float2 centered=local-hs;
+     float radius=radiusAt(centered,cornerRadii);
+     float sd=sdRoundedRect(centered,hs,radius);
+     float d=circleMap(clamp(1.0+min(sd,0.0)/refractionHeight,0.0,1.0))*refractionAmount;
+     float2 grad=normalize(gradSdRoundedRect(centered,hs,min(radius*1.5,min(hs.x,hs.y)))+depthEffect*normalize(centered+float2(0.00001))+float2(0.00001));
+     float2 p=coord+d*grad;
+     float dispersion=clamp((centered.x*centered.y)/(hs.x*hs.y),-1.0,1.0)*0.35;
+     half4 col=content.eval(p);
+     col.r=content.eval(p+d*grad*dispersion).r;
+     col.b=content.eval(p-d*grad*dispersion).b;
+     half3 tint=mix(half3(0.97,0.97,0.99),half3(0.18,0.18,0.21),isDark);
+     half3 rgb=mix(col.rgb,tint,mix(0.40,0.39,isDark));
+     float rim=1.0-smoothstep(0.0,2.5,abs(sd));
+     float shine=0.04+0.12*max(0.0,-grad.y);
+     float glow=press*(1.0-smoothstep(0.0,size.y*2.0,distance(local,touch)))*0.17;
+     return half4(clamp(rgb+half3(rim*shine+glow),0.0,1.0),1.0);
+   }
+   """;
  }
  static final class Glyph extends View {
-  final String kind;final int hi,lo;final boolean tile,dark;final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);boolean on;float position;ValueAnimator spring;final Bitmap mask;
+  final String kind;final int hi,lo;final boolean tile,dark;final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);boolean on;float position,pressed;ValueAnimator spring,pressAnimation;final Bitmap mask;
   Glyph(Context c,String k,int hi,int lo,boolean tile,boolean dark){super(c);kind=k;this.hi=hi;this.lo=lo;this.tile=tile;this.dark=dark;mask=IconMasks.load(k);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);}
-  void stop(){if(spring!=null)spring.cancel();}
-  void setOn(boolean state,boolean animate){if(on==state&&animate)return;on=state;stop();float end=state?1f:0f;if(!animate||!ValueAnimator.areAnimatorsEnabled()){position=end;invalidate();return;}spring=ValueAnimator.ofFloat(position,end);spring.setDuration(480);spring.setInterpolator(new OvershootInterpolator(.8f));spring.addUpdateListener(v->{position=(Float)v.getAnimatedValue();invalidate();});spring.start();}
+  void stop(){if(spring!=null)spring.cancel();if(pressAnimation!=null)pressAnimation.cancel();}
+  void press(boolean down){if(pressAnimation!=null)pressAnimation.cancel();pressAnimation=ValueAnimator.ofFloat(pressed,down?1f:0f);pressAnimation.setDuration(down?160:420);pressAnimation.setInterpolator(down?new DecelerateInterpolator():new OvershootInterpolator(.8f));pressAnimation.addUpdateListener(v->{pressed=Math.max(0f,(Float)v.getAnimatedValue());invalidate();});if(ValueAnimator.areAnimatorsEnabled())pressAnimation.start();else{pressed=down?1f:0f;invalidate();}}
+  void setOn(boolean state,boolean animate){if(on==state&&animate)return;on=state;if(spring!=null)spring.cancel();float end=state?1f:0f;if(!animate||!ValueAnimator.areAnimatorsEnabled()){position=end;invalidate();return;}spring=ValueAnimator.ofFloat(position,end);spring.setDuration(480);spring.setInterpolator(new OvershootInterpolator(.8f));spring.addUpdateListener(v->{position=(Float)v.getAnimatedValue();invalidate();});spring.start();}
   void path(Canvas c,float...xy){Path q=new Path();q.moveTo(xy[0],xy[1]);for(int i=2;i<xy.length;i+=2)q.lineTo(xy[i],xy[i+1]);c.drawPath(q,p);}
   @Override protected void onDraw(Canvas c){super.onDraw(c);c.save();c.scale(getWidth()/32f,getHeight()/32f);p.setShader(null);p.setStyle(Paint.Style.FILL);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
-   if(kind.equals("switch")){float t=Math.max(0,Math.min(1,position));p.setColor((Integer)new ArgbEvaluator().evaluate(t,dark?0xff57575b:0xffc7c7cc,0xff34c759));c.drawRoundRect(0,0,32,32,8,16,p);float center=7.7f+16.6f*t;float stretch=1f+(float)Math.sin(t*Math.PI)*.11f;p.setColor(Color.WHITE);c.drawRoundRect(center-6.8f*stretch,2,center+6.8f*stretch,30,7,14,p);c.restore();return;}
-   if(tile){p.setShader(new LinearGradient(0,0,0,32,hi,lo,Shader.TileMode.CLAMP));c.drawRoundRect(0,0,32,32,8,8,p);p.setShader(null);}
+   if(kind.equals("switch")){float t=Math.max(0,Math.min(1,position));p.setColor((Integer)new ArgbEvaluator().evaluate(t,dark?0xff57575b:0xffc7c7cc,0xff34c759));c.drawRoundRect(0,0,32,32,8,16,p);float center=7.7f+16.6f*t;float stretch=1f+(float)Math.sin(t*Math.PI)*.16f+pressed*.14f;float inset=2f+pressed*1.5f;p.setColor(Color.WHITE);p.setShader(new LinearGradient(0,0,0,32,new int[]{0xffffffff,0xfff4f4f7},null,Shader.TileMode.CLAMP));c.drawRoundRect(center-6.8f*stretch,inset,center+6.8f*stretch,32-inset,7,14,p);p.setShader(null);if(pressed>.01f){p.setColor((Math.min(100,(int)(pressed*70))<<24)|0x00ffffff);c.drawRoundRect(center-7.4f*stretch,0,center+7.4f*stretch,32,8,16,p);}c.restore();return;}
+   if(tile){p.setShader(new LinearGradient(0,0,0,32,hi,lo,Shader.TileMode.CLAMP));c.drawRoundRect(0,0,32,32,7.5f,7.5f,p);p.setShader(null);}
+   if(tile&&SettingsGlyphs.draw(c,p,kind)){c.restore();return;}
    if(mask!=null){p.setColor(Color.WHITE);p.setColorFilter(new PorterDuffColorFilter(tile?Color.WHITE:hi,PorterDuff.Mode.SRC_IN));float pad=tile?4:2;c.drawBitmap(mask,null,new RectF(pad,pad,32-pad,32-pad),p);p.setColorFilter(null);c.restore();return;}
    p.setColor(tile?Color.WHITE:hi);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);
    switch(kind){
