@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <application android:label="iSettings 27 Experimental" android:allowBackup="false">
+ <meta-data android:name="xposedmodule" android:value="true"/>
+ <meta-data android:name="xposeddescription" android:value="Experimental iOS-style Samsung Settings homepage"/>
+ <meta-data android:name="xposedminversion" android:value="82"/>
+ <meta-data android:name="xposedscope" android:resource="@array/module_scope"/>
+ </application>
+</manifest>
