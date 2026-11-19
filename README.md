@@ -11,3 +11,6 @@ Before releasing: test light/dark, every category, airplane state, native search
 
 ## 0.3 changes
 Uses Ionicons 8.1.0 glyphs from the exact demo dependency version, not Apple SF Symbols. The CI generates Android bitmap masks at build time from npm SVGs and bundles their license. For a local build, run npm pack ionicons@8.1.0, extract the archive, install CairoSVG and run python scripts/generate_icons.py path/to/package before Gradle. Unmapped categories have differentiated icon types, and the scroll container is inset from system bars. Visual fixes require on-device verification. The text and glass material remain approximations.
+
+## 0.4
+White glyphs in both themes; dark charcoal cards; lighter typography on themed text; compact rows. Animated airplane switch follows actual observed state. Spring-like touch feedback on homepage controls. Search uses a sampled scroll-content backdrop at up to 30 updates/sec, AGSL blur/refraction at edges on API 33+ hardware canvas, and an opaque fallback if unsupported. No exact Apple optical or frame-rate claim. No submenu transition replacement. Device testing required.
