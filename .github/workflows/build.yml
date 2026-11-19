@@ -32,6 +32,14 @@ jobs:
           fi
           test -f "$SDK/platforms/android-35/android.jar"
           test -x "$SDK/build-tools/35.0.0/aapt2"
+      - name: Generate original reference icon masks
+        run: |
+          npm pack ionicons@8.1.0 --pack-destination "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/icon-source"
+          tar -xzf "$RUNNER_TEMP/ionicons-8.1.0.tgz" -C "$RUNNER_TEMP/icon-source"
+          python3 -m venv "$RUNNER_TEMP/icon-venv"
+          "$RUNNER_TEMP/icon-venv/bin/pip" install cairosvg==2.7.1
+          "$RUNNER_TEMP/icon-venv/bin/python" scripts/generate_icons.py "$RUNNER_TEMP/icon-source/package"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
