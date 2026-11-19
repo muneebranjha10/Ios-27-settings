@@ -72,7 +72,7 @@ public final class Entry implements IXposedHookLoadPackage {
   }
   int dp(float x){return Math.round(a.getResources().getDisplayMetrics().density*x);}
   GradientDrawable round(int c,float r){GradientDrawable d=new GradientDrawable();d.setColor(c);d.setCornerRadius(dp(r));return d;}
-  TextView text(String s,float z,int color,boolean bold){TextView v=new TextView(a);v.setText(s);v.setTextSize(z);v.setTextColor(color);v.setTypeface(Typeface.create("sans-serif",bold?700:400,false));v.getPaint().setFakeBoldText(false);v.setIncludeFontPadding(false);return v;}
+  TextView text(String s,float z,int color,boolean bold){TextView v=new TextView(a);v.setText(s);v.setTextSize(z);v.setTextColor(color);v.setTypeface(Typeface.create(Typeface.create("sans-serif",Typeface.NORMAL),bold?700:400,false));v.getPaint().setFakeBoldText(false);v.setIncludeFontPadding(false);return v;}
   LinearLayout group(){LinearLayout g=new LinearLayout(a);g.setOrientation(1);g.setBackground(round(card,28));g.setClipToOutline(true);content.addView(g,new LinearLayout.LayoutParams(-1,-2));return g;}
   void gap(int n){content.addView(new View(a),new LinearLayout.LayoutParams(1,dp(n)));}
   String value(Object p,String method){try{Object x=XposedHelpers.callMethod(p,method);return x==null?"":x.toString();}catch(Throwable e){return "";}}
