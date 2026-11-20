@@ -127,7 +127,7 @@ public final class Entry implements IXposedHookLoadPackage {
    TextView heading=refText("Settings",30,fg,650);heading.setGravity(Gravity.CENTER);header.addView(heading,new FrameLayout.LayoutParams(-1,-1));
    FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-1,px(94),Gravity.TOP);layer.addView(header,hp);
    scroll.setOnScrollChangeListener((v,x,y,ox,oy)->{if(upstreamSearch!=null)upstreamSearch.refresh();else if(glassView!=null)glassView.requestSample();float fraction=Math.max(0,Math.min(1,(y-px(115))/(float)px(47)));largeTitle.setAlpha(1f-fraction);header.setVisibility(fraction>0?View.VISIBLE:View.INVISIBLE);header.setAlpha(fraction);if(fraction>0)headerGlass.requestSample();});
-   search.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->glassView.requestSample());header.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->headerGlass.requestSample());
+   search.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(upstreamSearch!=null)upstreamSearch.refresh();else if(glassView!=null)glassView.requestSample();});header.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->headerGlass.requestSample());
 
    for(int i=0;i<root.getChildCount();i++){View v=root.getChildAt(i);importance.put(v,v.getImportantForAccessibility());v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);}
    root.addView(layer,new FrameLayout.LayoutParams(-1,-1));mountedNow=true;
