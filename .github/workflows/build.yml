@@ -22,15 +22,14 @@ jobs:
           test -d "$SDK"
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
-          if [ ! -f "$SDK/platforms/android-37/android.jar" ] || [ ! -x "$SDK/build-tools/37.0.0/aapt2" ]; then
-            MANAGER="$(command -v sdkmanager || true)"
-            if [ -z "$MANAGER" ]; then
-              MANAGER="$(find "$SDK/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -1)"
-            fi
-            test -n "$MANAGER"
-            "$MANAGER" --sdk_root="$SDK" 'platforms;android-37' 'build-tools;37.0.0'
-          fi
-          test -f "$SDK/platforms/android-37/android.jar"
+          MANAGER="$(find "$SDK/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -1)"
+          if [ -z "$MANAGER" ]; then MANAGER="$(command -v sdkmanager)"; fi
+          test -n "$MANAGER"
+          "$MANAGER" --sdk_root="$SDK" --channel=3 --list > "$RUNNER_TEMP/sdk-list.txt"
+          grep -E 'platforms;android-37(\.0)?[[:space:]]*\||build-tools;37\.' "$RUNNER_TEMP/sdk-list.txt" || true
+          PLATFORM="$(awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); if ($1=="platforms;android-37.0" || $1=="platforms;android-37") print $1}' "$RUNNER_TEMP/sdk-list.txt" | sort -u | tail -1)"
+          test -n "$PLATFORM"
+          "$MANAGER" --sdk_root="$SDK" --channel=3 "$PLATFORM" 'build-tools;37.0.0'
           test -x "$SDK/build-tools/37.0.0/aapt2"
       - name: Generate original reference icon masks
         run: |
