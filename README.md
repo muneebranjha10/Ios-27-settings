@@ -23,3 +23,6 @@ Reference-derived alpha masks for 17 icons, with sampled gradient palette. Masks
 
 ## 0.7
 Replaces low-resolution reference masks in rendering with independently drawn native paths, preserves reference gradient colors, and keeps uniform tile, row and chevron alignment. Uses native account icon when the preference exposes one, otherwise existing fallback. Fixes duplicate title during scroll. Lowers search lens blur and tint, strengthens specular edges, keeps the pressed toggle thumb visible and approximates upstream combined backdrop using the scaled track on the actual card color. This is still a native adaptation, not the complete Compose library; runtime shader activation and motion must be verified on device. No exact Apple vector asset or 120 Hz claims.
+
+## 0.8 reference layout
+See DESIGN_REFERENCE.md. All main homepage geometry now scales from the 754px screenshot, not guessed dp constants. Removed screenshot masks from current source, use crisp independently drawn vectors and reference-style dotted account icon. Fixed row size/spacing and subtle grey search. Retains native Samsung categories rather than adding fake iOS services. Light mode is the design baseline; dark mode remains supported. No claim of pixel-perfect rendering, exact Apple font, full library integration or verified GPU performance.
