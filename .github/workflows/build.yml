@@ -1,7 +1,7 @@
 name: Build experimental APK
 on:
   push:
-    branches: [main]
+    branches: [main, upstream-glass]
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - name: Use runner Android SDK and install required packages
         shell: bash
         run: |
@@ -22,16 +22,16 @@ jobs:
           test -d "$SDK"
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
-          if [ ! -f "$SDK/platforms/android-35/android.jar" ] || [ ! -x "$SDK/build-tools/35.0.0/aapt2" ]; then
+          if [ ! -f "$SDK/platforms/android-37/android.jar" ] || [ ! -x "$SDK/build-tools/37.0.0/aapt2" ]; then
             MANAGER="$(command -v sdkmanager || true)"
             if [ -z "$MANAGER" ]; then
               MANAGER="$(find "$SDK/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -1)"
             fi
             test -n "$MANAGER"
-            "$MANAGER" --sdk_root="$SDK" 'platforms;android-35' 'build-tools;35.0.0'
+            "$MANAGER" --sdk_root="$SDK" 'platforms;android-37' 'build-tools;37.0.0'
           fi
-          test -f "$SDK/platforms/android-35/android.jar"
-          test -x "$SDK/build-tools/35.0.0/aapt2"
+          test -f "$SDK/platforms/android-37/android.jar"
+          test -x "$SDK/build-tools/37.0.0/aapt2"
       - name: Generate original reference icon masks
         run: |
           npm pack ionicons@8.1.0 --pack-destination "$RUNNER_TEMP"
@@ -42,7 +42,7 @@ jobs:
           "$RUNNER_TEMP/icon-venv/bin/python" scripts/generate_icons.py "$RUNNER_TEMP/icon-source/package"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: '9.7.1'
       - run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
