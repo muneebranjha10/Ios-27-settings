@@ -15,7 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.AndroidUiDispatcher
 import androidx.compose.ui.platform.ComposeView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -50,7 +56,8 @@ class UpstreamGlassHost private constructor(
     private val isToggle: Boolean,
     initial: Boolean,
     private val searchAction: Runnable?,
-    private val toggleAction: ToggleAction?
+    private val toggleAction: ToggleAction?,
+    private val onFailure: Runnable
 ) : FrameLayout(activity) {
     fun interface ToggleAction { fun select(value: Boolean) }
     private val selected = mutableStateOf(initial)
@@ -58,16 +65,24 @@ class UpstreamGlassHost private constructor(
     private val owner = GlassOwner()
     private val compose: ComposeView
     private var closed = false
+    private var failed = false
+    private val scope = CoroutineScope(AndroidUiDispatcher.CurrentThread + SupervisorJob() + CoroutineExceptionHandler { _, error -> reportFailure(error) })
+    private val recomposer = Recomposer(scope.coroutineContext)
     private val sample = Runnable { capture() }
 
     init {
         owner.controller.performAttach()
         owner.controller.performRestore(null)
         owner.registry.currentState = Lifecycle.State.CREATED
+        // The Settings window belongs to another app. Do not use its window recomposer.
+        setViewTreeLifecycleOwner(owner)
+        setViewTreeSavedStateRegistryOwner(owner)
+        setViewTreeViewModelStoreOwner(owner)
         // Use module resources to prevent Settings' resource IDs from being interpreted
         // as Compose library resources. The outer FrameLayout still uses host context.
         val moduleContext = activity.createPackageContext("dev.isettings.theme", Context.CONTEXT_IGNORE_SECURITY)
         compose = ComposeView(moduleContext)
+        compose.setParentCompositionContext(recomposer)
         compose.setViewTreeLifecycleOwner(owner)
         compose.setViewTreeSavedStateRegistryOwner(owner)
         compose.setViewTreeViewModelStoreOwner(owner)
@@ -77,6 +92,7 @@ class UpstreamGlassHost private constructor(
         clipChildren = false
         clipToPadding = false
         addView(compose, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        scope.launch { recomposer.runRecomposeAndApplyChanges() }
         compose.setContent {
             val backdrop = rememberCanvasBackdrop {
                 val image = snapshot.value
@@ -124,8 +140,29 @@ class UpstreamGlassHost private constructor(
         if (!closed) {
             owner.registry.currentState = Lifecycle.State.RESUMED
             refresh()
-            Entry.log("v0.10 upstream Compose glass attached " + if (isToggle) "toggle" else "search")
+            Entry.log("v0.11 isolated Compose glass attached " + if (isToggle) "toggle" else "search")
         }
+    }
+    private fun reportFailure(error: Throwable) {
+        if (closed || failed) return
+        failed = true
+        Entry.log("v0.11 Compose host failure: " + android.util.Log.getStackTraceString(error))
+        android.os.Handler(android.os.Looper.getMainLooper()).post { if (!closed) onFailure.run() }
+    }
+    override fun onMeasure(w: Int, h: Int) {
+        try { super.onMeasure(w,h) } catch (e: Exception) {
+            reportFailure(e)
+            setMeasuredDimension(View.MeasureSpec.getSize(w),View.MeasureSpec.getSize(h))
+        } catch (e: LinkageError) {
+            reportFailure(e)
+            setMeasuredDimension(View.MeasureSpec.getSize(w),View.MeasureSpec.getSize(h))
+        }
+    }
+    override fun onLayout(changed: Boolean,l: Int,t: Int,r: Int,b: Int) {
+        try { super.onLayout(changed,l,t,r,b) } catch (e: Exception) { reportFailure(e) } catch (e: LinkageError) { reportFailure(e) }
+    }
+    override fun dispatchDraw(canvas: AndroidCanvas) {
+        try { super.dispatchDraw(canvas) } catch (e: Exception) { reportFailure(e) } catch (e: LinkageError) { reportFailure(e) }
     }
     override fun onDetachedFromWindow() {
         close()
@@ -156,9 +193,11 @@ class UpstreamGlassHost private constructor(
     fun close() {
         if (closed) return
         closed=true;removeCallbacks(sample);snapshot.value=null
-        compose.disposeComposition()
-        owner.registry.currentState=Lifecycle.State.DESTROYED
-        owner.viewModelStore.clear()
+        runCatching { compose.disposeComposition() }
+        runCatching { recomposer.cancel() }
+        scope.cancel()
+        runCatching { owner.registry.currentState=Lifecycle.State.DESTROYED }
+        runCatching { owner.viewModelStore.clear() }
     }
     private class GlassOwner : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
         val registry=LifecycleRegistry(this)
@@ -168,9 +207,9 @@ class UpstreamGlassHost private constructor(
         override val viewModelStore=ViewModelStore()
     }
     companion object {
-        @JvmStatic fun search(activity: Activity, source: View, bg: Int, dark: Boolean, action: Runnable)=
-            UpstreamGlassHost(activity,source,bg,dark,false,false,action,null)
-        @JvmStatic fun toggle(activity: Activity, bg: Int, dark: Boolean, initial: Boolean, action: ToggleAction)=
-            UpstreamGlassHost(activity,null,bg,dark,true,initial,null,action)
+        @JvmStatic fun search(activity: Activity, source: View, bg: Int, dark: Boolean, action: Runnable, failure: Runnable)=
+            UpstreamGlassHost(activity,source,bg,dark,false,false,action,null,failure)
+        @JvmStatic fun toggle(activity: Activity, bg: Int, dark: Boolean, initial: Boolean, action: ToggleAction, failure: Runnable)=
+            UpstreamGlassHost(activity,null,bg,dark,true,initial,null,action,failure)
     }
 }
