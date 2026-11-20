@@ -35,6 +35,7 @@ public final class Entry implements IXposedHookLoadPackage {
  static boolean home(Object a){return a!=null&&HOME.equals(a.getClass().getName());}
  @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam p){
   if(!"com.android.settings".equals(p.packageName)||!p.packageName.equals(p.processName))return;
+  WifiTheme.hook(p.classLoader);
   try{
    Class<?> top=XposedHelpers.findClass(TOP,p.classLoader);
    XposedHelpers.findAndHookMethod(top,"onResume",new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){fragment=new WeakReference<>(p.thisObject);schedule(p.thisObject);}});
@@ -63,7 +64,7 @@ public final class Entry implements IXposedHookLoadPackage {
    if(!prefs.containsKey("top_level_connections")||!prefs.containsKey("top_level_general"))return;
    View root=a.findViewById(android.R.id.content);if(!(root instanceof FrameLayout))return;
    if(old!=null)old.remove();t=new Theme(a,(FrameLayout)root,prefs);t.mount();mounted=new WeakReference<>(t);log("themed homepage mounted; "+prefs.size()+" native entries");
-  }catch(Throwable e){boolean retry=t!=null&&!upstreamDisabled&&(t.upstreamSearch!=null||t.upstreamToggle!=null);if(retry)upstreamDisabled=true;if(t!=null)try{t.remove();}catch(Throwable cleanup){log("cleanup "+cleanup);}log("v0.11 homepage mount failed "+android.util.Log.getStackTraceString(e));if(retry){View v=a.findViewById(android.R.id.content);if(v!=null)v.post(()->install(a,f));}}
+  }catch(Throwable e){boolean retry=t!=null&&!upstreamDisabled&&(t.upstreamSearch!=null||t.upstreamToggle!=null);if(retry)upstreamDisabled=true;if(t!=null)try{t.remove();}catch(Throwable cleanup){log("cleanup "+cleanup);}log("v0.12 homepage mount failed "+android.util.Log.getStackTraceString(e));if(retry){View v=a.findViewById(android.R.id.content);if(v!=null)v.post(()->install(a,f));}}
  }
  static final class Theme {
   final Activity a;final FrameLayout root,layer;final ScrollView scroll;final LinearLayout content;final Map<String,Object> prefs;
@@ -108,7 +109,7 @@ public final class Entry implements IXposedHookLoadPackage {
    g=group();pref(g,"top_level_general","General","gear",0xffa9a9ae,0xff83838a);pref(g,"top_level_accessibility","Accessibility","access",0xff489bfd,0xff2b77f4);pref(g,"top_level_advanced_features",null,"action",0xff489bfd,0xff2b77f4);pref(g,"top_level_galaxy_ai",null,"ai",0xffc4a0ff,0xff8073e8);pref(g,"top_level_display",null,"sun",0xff489bfd,0xff2b77f4);pref(g,"top_level_wallpaper",null,"image",0xff489bfd,0xff2b77f4);pref(g,"top_level_homescreen",null,"grid",0xff489bfd,0xff2b77f4);pref(g,"top_level_lockscreen",null,"lock",0xff9b9de8,0xff696bd3);gap(60);g=group();pref(g,"top_level_notifications",null,"bell",0xffff5360,0xffff2347);pref(g,"top_level_sounds",null,"sound",0xffff5360,0xffff2347);if(g.getChildCount()==0)content.removeView(g);else gap(60);
    g=group();for(Map.Entry<String,Object> e:prefs.entrySet())if(!used.contains(e.getKey())){Object p=e.getValue();String n=value(p,"getTitle");if(!n.isEmpty()){String kind=category(e.getKey(),n);int[] colors=palette(kind);row(g,n,kind,colors[0],colors[1],"",()->openPref(p),false);}}
    if(g.getChildCount()==0)content.removeView(g);
-   gap(30);TextView original=text("Original Samsung Settings · v0.11",15,0xff2b77f4,false);original.setGravity(Gravity.CENTER);content.addView(original,new LinearLayout.LayoutParams(-1,dp(48)));original.setOnClickListener(v->nativePage());
+   gap(30);TextView original=text("Original Samsung Settings · v0.12",15,0xff2b77f4,false);original.setGravity(Gravity.CENTER);content.addView(original,new LinearLayout.LayoutParams(-1,dp(48)));original.setOnClickListener(v->nativePage());
    FrameLayout search=new FrameLayout(a);search.setElevation(0);search.setClipToOutline(true);GradientDrawable searchShape=new GradientDrawable();searchShape.setColor(Color.TRANSPARENT);searchShape.setCornerRadius(px(41));search.setBackground(searchShape);
    try{
     if(upstreamDisabled)throw new IllegalStateException("Compose disabled after host failure");
@@ -148,7 +149,7 @@ public final class Entry implements IXposedHookLoadPackage {
   void row(LinearLayout g,String name,String kind,int hi,int lo,String status,Runnable click,boolean toggle){
    if(g.getChildCount()>0){View v=new View(a);v.setBackgroundColor(line);LinearLayout.LayoutParams l=new LinearLayout.LayoutParams(-1,Math.max(1,px(1)));l.setMargins(px(103),0,px(34),0);g.addView(v,l);}
    LinearLayout r=new LinearLayout(a);r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(px(30),0,px(26),0);r.addView(new Glyph(a,kind,hi,lo,true,dark),new LinearLayout.LayoutParams(px(50),px(50)));TextView label=refText(name,29,fg,400);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams l=new LinearLayout.LayoutParams(0,-2,1);l.leftMargin=px(23);r.addView(label,l);
-   if(toggle){try{if(upstreamDisabled)throw new IllegalStateException("Compose disabled after host failure");upstreamToggle=UpstreamGlassHost.toggle(a,card,dark,isAirplane(),target->{if(target!=isAirplane())toggleAirplane();else refreshAirplane();},()->recoverNative());r.setClipChildren(false);r.addView(upstreamToggle,new LinearLayout.LayoutParams(px(118),px(66)));r.setContentDescription("Airplane Mode");}catch(Throwable e){log("upstream toggle attach failed "+e);upstreamToggle=null;airplaneGlyph=new Glyph(a,"switch",0,0,false,dark);airplaneGlyph.setOn(isAirplane(),false);r.addView(airplaneGlyph,new LinearLayout.LayoutParams(px(108),px(62)));r.setContentDescription("Airplane Mode, "+(airplaneGlyph.on?"on":"off"));airplaneGlyph.setClickable(true);airplaneGlyph.setOnTouchListener((view,event)->{switch(event.getActionMasked()){case MotionEvent.ACTION_DOWN: view.getParent().requestDisallowInterceptTouchEvent(true);airplaneGlyph.beginDrag(event.getX());return true;case MotionEvent.ACTION_MOVE:airplaneGlyph.drag(event.getX());return true;case MotionEvent.ACTION_UP: view.getParent().requestDisallowInterceptTouchEvent(false);boolean target=airplaneGlyph.endDrag(false);if(target!=isAirplane())toggleAirplane();else airplaneGlyph.setOn(isAirplane(),true);return true;case MotionEvent.ACTION_CANCEL:view.getParent().requestDisallowInterceptTouchEvent(false);airplaneGlyph.endDrag(true);return true;}return true;});}}
+   if(toggle){try{if(upstreamDisabled)throw new IllegalStateException("Compose disabled after host failure");upstreamToggle=UpstreamGlassHost.toggle(a,card,dark,isAirplane(),target->{if(target!=isAirplane())toggleAirplane();else refreshAirplane();},()->recoverNative());r.setClipChildren(false);r.setClipToPadding(false);r.addView(upstreamToggle,new LinearLayout.LayoutParams(px(126),px(78)));r.setContentDescription("Airplane Mode");}catch(Throwable e){log("upstream toggle attach failed "+e);upstreamToggle=null;airplaneGlyph=new Glyph(a,"switch",0,0,false,dark);airplaneGlyph.setOn(isAirplane(),false);r.addView(airplaneGlyph,new LinearLayout.LayoutParams(px(108),px(62)));r.setContentDescription("Airplane Mode, "+(airplaneGlyph.on?"on":"off"));airplaneGlyph.setClickable(true);airplaneGlyph.setOnTouchListener((view,event)->{switch(event.getActionMasked()){case MotionEvent.ACTION_DOWN: view.getParent().requestDisallowInterceptTouchEvent(true);airplaneGlyph.beginDrag(event.getX());return true;case MotionEvent.ACTION_MOVE:airplaneGlyph.drag(event.getX());return true;case MotionEvent.ACTION_UP: view.getParent().requestDisallowInterceptTouchEvent(false);boolean target=airplaneGlyph.endDrag(false);if(target!=isAirplane())toggleAirplane();else airplaneGlyph.setOn(isAirplane(),true);return true;case MotionEvent.ACTION_CANCEL:view.getParent().requestDisallowInterceptTouchEvent(false);airplaneGlyph.endDrag(true);return true;}return true;});}}
    else{if(!status.isEmpty()){TextView note=refText(status,28,sub,400);note.setSingleLine(true);note.setMaxWidth(px(200));note.setEllipsize(android.text.TextUtils.TruncateAt.END);r.addView(note);}r.addView(new Glyph(a,"chevron",sub,sub,false,dark),new LinearLayout.LayoutParams(px(36),px(42)));}
    int rowHeight=Math.max(px(89),px(89*referenceFontScale()));g.addView(r,new LinearLayout.LayoutParams(-1,rowHeight-(g.getChildCount()>0?Math.max(1,px(1)):0)));interactive(r,click);r.setFocusable(true);
   }
@@ -163,7 +164,7 @@ public final class Entry implements IXposedHookLoadPackage {
   void action(String action){try{Intent i=new Intent(action);i.setPackage("com.android.settings");if(i.resolveActivity(a.getPackageManager())==null){Object p=prefs.get("top_level_connections");if(p!=null){openPref(p);return;}throw new IllegalStateException("no native activity");}a.startActivity(i);}catch(Throwable e){error(e);}}
   void search(){nativePage();try{if(nativeSearch!=null&&nativeSearch.performClick())return;Toast.makeText(a,"Use the original Settings search",Toast.LENGTH_SHORT).show();}catch(Throwable e){error(e);}}
   void error(Throwable e){log("action "+e);Toast.makeText(a,"Native action unavailable",Toast.LENGTH_SHORT).show();}
-  void recoverNative(){if(!mountedNow)return;upstreamDisabled=true;log("v0.11 remounting native controls after Compose failure");remove();Object f=fragment.get();if(f!=null)root.post(()->install(a,f));}
+  void recoverNative(){if(!mountedNow)return;upstreamDisabled=true;log("v0.12 remounting native controls after Compose failure");remove();Object f=fragment.get();if(f!=null)root.post(()->install(a,f));}
   void remove(){mountedNow=false;if(upstreamSearch!=null)try{upstreamSearch.close();}catch(Throwable e){log("search cleanup "+e);}if(upstreamToggle!=null)try{upstreamToggle.close();}catch(Throwable e){log("toggle cleanup "+e);}if(glassView!=null)glassView.stop();if(headerGlass!=null)headerGlass.stop();if(airplaneGlyph!=null)airplaneGlyph.stop();handler.removeCallbacksAndMessages(null);if(airplaneObserver!=null){try{a.getContentResolver().unregisterContentObserver(airplaneObserver);}catch(Throwable ignored){}airplaneObserver=null;}if(layer.getParent()==root)root.removeView(layer);for(Map.Entry<View,Integer> v:importance.entrySet())v.getKey().setImportantForAccessibility(v.getValue());importance.clear();}
   static View findSearch(View v){String id="";try{if(v.getId()!=View.NO_ID)id=v.getResources().getResourceEntryName(v.getId()).toLowerCase(Locale.ROOT);}catch(Throwable ignored){}if(v.isShown()&&v.isClickable()&&(id.contains("search")||v.getClass().getName().equals("com.samsung.android.settings.homepage.SearchView")))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View x=findSearch(g.getChildAt(i));if(x!=null)return x;}}return null;}
  }
@@ -196,16 +197,16 @@ public final class Entry implements IXposedHookLoadPackage {
     if(directSample==null||directSample.getWidth()!=bw||directSample.getHeight()!=bh){directSample=Bitmap.createBitmap(bw,bh,Bitmap.Config.ARGB_8888);directCanvas=new Canvas(directSample);input=new BitmapShader(directSample,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP);Matrix shift=new Matrix();shift.setTranslate(-pad,-pad);input.setLocalMatrix(shift);dirty=true;}
     if(dirty){directSample.eraseColor(bg);source.getLocationOnScreen(src);getLocationOnScreen(dst);directCanvas.save();try{directCanvas.translate(src[0]-dst[0]+pad,src[1]-dst[1]+pad);source.draw(directCanvas);}finally{directCanvas.restore();}dirty=false;}
     directShader.setInputShader("content",input);GlassEngine.configure(directShader,w,h,0,0,radius,header?dp(1):dp(12)+dp(5)*t,header?0:dp(17)+dp(12)*t,header?0:.6f);
-    paint.setShader(directShader);c.drawRoundRect(0,0,w,h,radius,radius,paint);paint.setShader(null);if(!logged){logged=true;log("v0.11 direct GPU glass active "+(header?"header":"search"));}return true;
-   }catch(Throwable e){paint.setShader(null);directFailed=true;log("v0.11 direct glass failed "+e);return false;}}
+    paint.setShader(directShader);c.drawRoundRect(0,0,w,h,radius,radius,paint);paint.setShader(null);if(!logged){logged=true;log("v0.12 direct GPU glass active "+(header?"header":"search"));}return true;
+   }catch(Throwable e){paint.setShader(null);directFailed=true;log("v0.12 direct glass failed "+e);return false;}}
   @Override protected void onDraw(Canvas c){super.onDraw(c);int w=getWidth(),h=getHeight();if(w==0||h==0||stopped)return;float r=header?0:h*.5f,t=Math.max(0,Math.min(1,progress));boolean drawn=false;
    paint.setShader(null);paint.setStyle(Paint.Style.FILL);Path clip=new Path();clip.addRoundRect(0,0,w,h,r,r,Path.Direction.CW);
    if(shader!=null&&!renderNodeFailed&&c.isHardwareAccelerated())try{if(dirty||!ready)capture(w,h);GlassEngine.configure(shader,w,h,-pad,-pad,r,header?dp(1):dp(10)+dp(5)*t,header?0:dp(17)+dp(12)*t,header?0:0.65f);
     node.setRenderEffect(GlassEngine.effect(shader,header?dp(13):dp(3.0f)-dp(1.5f)*t));c.save();try{c.clipPath(clip);c.translate(-pad,-pad);c.drawRenderNode(node);drawn=true;}finally{c.restore();}
-    if(!logged){logged=true;log("v0.11 GPU glass active "+(header?"header":"search"));}
-   }catch(Throwable e){renderNodeFailed=true;dirty=true;logged=false;log("v0.11 RenderNode glass failed "+e);}
+    if(!logged){logged=true;log("v0.12 GPU glass active "+(header?"header":"search"));}
+   }catch(Throwable e){renderNodeFailed=true;dirty=true;logged=false;log("v0.12 RenderNode glass failed "+e);}
    if(!drawn)drawn=drawDirect(c,w,h,r,t);
-   if(!drawn){paint.setColor(dark?0xff343438:0xffdedde2);c.drawRoundRect(0,0,w,h,r,r,paint);if(!logged){logged=true;log("v0.11 flat fallback: hardware="+c.isHardwareAccelerated()+" shader="+(shader!=null));}}
+   if(!drawn){paint.setColor(dark?0xff343438:0xffdedde2);c.drawRoundRect(0,0,w,h,r,r,paint);if(!logged){logged=true;log("v0.12 flat fallback: hardware="+c.isHardwareAccelerated()+" shader="+(shader!=null));}}
    paint.setColor(header?(dark?0xd0101013:0xcaf7f7fa):(dark?0x703a3a3e:0x62dedde2));c.drawRoundRect(0,0,w,h,r,r,paint);
    if(header){paint.setColor(dark?0x33444448:0x22a0a0a8);c.drawRect(0,h-1,w,h,paint);return;}
    paint.setShader(new LinearGradient(0,0,w,h,new int[]{dark?0x9affffff:0xddffffff,0x20ffffff,dark?0x80ffffff:0xbaffffff},new float[]{0,.45f,1},Shader.TileMode.CLAMP));paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(Math.max(1,dp(.65f)));c.drawRoundRect(1,1,w-1,h-1,r-1,r-1,paint);paint.setStyle(Paint.Style.FILL);paint.setShader(null);
@@ -227,20 +228,22 @@ public final class Entry implements IXposedHookLoadPackage {
    RectF track=new RectF(0,cy-trackH*.5f,w,cy+trackH*.5f),thumb=new RectF(cx-thumbW*.5f,cy-thumbH*.5f,cx+thumbW*.5f,cy+thumbH*.5f);
    int color=(Integer)new ArgbEvaluator().evaluate(t,dark?0xff57575b:0xffc5c6c8,dark?0xff30d158:0xff34c759);
    p.setShader(null);p.setColor(color);p.setStyle(Paint.Style.FILL);c.drawRoundRect(track,trackH*.5f,trackH*.5f,p);
-   boolean glass=false;if(pr>.2f&&thumbShader!=null&&thumbNode!=null&&c.isHardwareAccelerated())try{
+   float lensProgress=Math.max(on?.32f:.08f,Math.max(pr,4*t*(1-t)));boolean glass=false;if(thumbShader!=null&&thumbNode!=null&&c.isHardwareAccelerated())try{
     int ww=Math.max(1,(int)Math.ceil(w)),hh=Math.max(1,(int)Math.ceil(h));thumbNode.setPosition(0,0,ww,hh);RecordingCanvas rc=thumbNode.beginRecording();
     try{rc.drawColor(dark?0xff242426:0xffffffff);rc.save();rc.scale(.70f,.52f+.23f*pr,cx,cy);p.setColor(color);rc.drawRoundRect(track,trackH*.5f,trackH*.5f,p);rc.restore();}finally{thumbNode.endRecording();}
-    GlassEngine.configure(thumbShader,thumbW,thumbH,-thumb.left,-thumb.top,thumbH*.5f,5*density*pr,10*density*pr,.8f);
-    thumbNode.setRenderEffect(GlassEngine.effect(thumbShader,8*density*(1-pr)));Path shape=new Path();shape.addRoundRect(thumb,thumbH*.5f,thumbH*.5f,Path.Direction.CW);c.save();try{c.clipPath(shape);c.drawRenderNode(thumbNode);glass=true;}finally{c.restore();}
-    if(!thumbLogged){thumbLogged=true;log("v0.11 GPU glass active toggle");}
+    GlassEngine.configure(thumbShader,thumbW,thumbH,-thumb.left,-thumb.top,thumbH*.5f,Math.max(1f,5*density*lensProgress),14*density*lensProgress,.8f);
+    thumbNode.setRenderEffect(GlassEngine.effect(thumbShader,3*density*(1-lensProgress)));Path shape=new Path();shape.addRoundRect(thumb,thumbH*.5f,thumbH*.5f,Path.Direction.CW);c.save();try{c.clipPath(shape);c.drawRenderNode(thumbNode);glass=true;}finally{c.restore();}
+    if(!thumbLogged){thumbLogged=true;log("v0.12 GPU glass active toggle");}
    }catch(Throwable e){thumbShader=null;log("toggle lens fallback "+e);}
-   p.setColor(glass?((int)(120+(1f-pr)*135)<<24)|0xffffff:Color.WHITE);c.drawRoundRect(thumb,thumbH*.5f,thumbH*.5f,p);
+   p.setColor(glass?((int)(115+(1f-lensProgress)*115)<<24)|0xffffff:Color.WHITE);c.drawRoundRect(thumb,thumbH*.5f,thumbH*.5f,p);
    p.setShader(new LinearGradient(thumb.left,thumb.top,thumb.right,thumb.bottom,new int[]{0xffffffff,0x85ffffff,0xc0ffffff},null,Shader.TileMode.CLAMP));p.setStrokeWidth(Math.max(1,density*.7f));p.setStyle(Paint.Style.STROKE);c.drawRoundRect(thumb,thumbH*.5f,thumbH*.5f,p);p.setStyle(Paint.Style.FILL);p.setShader(null);
   }
   void path(Canvas c,float...xy){Path q=new Path();q.moveTo(xy[0],xy[1]);for(int i=2;i<xy.length;i+=2)q.lineTo(xy[i],xy[i+1]);c.drawPath(q,p);}
   @Override protected void onDraw(Canvas c){super.onDraw(c);c.save();c.scale(getWidth()/32f,getHeight()/32f);p.setShader(null);p.setStyle(Paint.Style.FILL);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
    if(kind.equals("switch")){c.restore();drawToggle(c);return;}
-   if(tile){int[] col=ReferencePalette.colors(kind,hi,lo);p.setShader(new LinearGradient(0,0,0,32,col[0],col[1],Shader.TileMode.CLAMP));c.drawRoundRect(0,0,32,32,7.5f,7.5f,p);p.setShader(null);c.save();c.scale(.90f,.90f,16,16);boolean drawn=CrispIcons.draw(c,p,kind);c.restore();if(drawn){c.restore();return;}}
+   if(tile){int[] col=dark?new int[]{0xffa7b5d5,0xff677599}:ReferencePalette.colors(kind,hi,lo);p.setShader(new LinearGradient(0,0,32,32,col[0],col[1],Shader.TileMode.CLAMP));c.drawRoundRect(.5f,.5f,31.5f,31.5f,7.5f,7.5f,p);p.setShader(null);
+    if(dark){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(.85f);p.setShader(new LinearGradient(0,0,32,32,new int[]{0xc8ffffff,0x15ffffff,0x75c7d8ff},null,Shader.TileMode.CLAMP));c.drawRoundRect(1,1,31,31,7,7,p);p.setShader(null);p.setStyle(Paint.Style.FILL);}
+    c.save();c.scale(.86f,.86f,16,16);boolean drawn=CrispIcons.draw(c,p,kind);c.restore();if(drawn){c.restore();return;}}
    if(tile&&SettingsGlyphs.draw(c,p,kind)){c.restore();return;}
    if(mask!=null){p.setColor(Color.WHITE);p.setColorFilter(new PorterDuffColorFilter(tile?Color.WHITE:hi,PorterDuff.Mode.SRC_IN));float pad=tile?4:2;c.drawBitmap(mask,null,new RectF(pad,pad,32-pad,32-pad),p);p.setColorFilter(null);c.restore();return;}
    p.setColor(tile?Color.WHITE:hi);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);

@@ -3,7 +3,7 @@ android {
  namespace 'dev.isettings.theme'
  compileSdk 37
  buildToolsVersion '37.0.0'
- defaultConfig { applicationId 'dev.isettings.theme'; minSdk 31; targetSdk 32; versionCode 11; versionName '0.11-lifecycle-fix' }
+ defaultConfig { applicationId 'dev.isettings.theme'; minSdk 31; targetSdk 32; versionCode 12; versionName '0.12-wifi-glass' }
  buildFeatures { compose true }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
  packaging { resources { excludes += ['DebugProbesKt.bin','kotlin-tooling-metadata.json','META-INF/*.version','META-INF/**/LICENSE.txt'] } }

@@ -1,6 +1,8 @@
 // From Kyant0/AndroidLiquidGlass 2.0.1, Apache-2.0; see bundled license.
 package com.kyant.backdrop.catalog.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -113,6 +115,20 @@ fun LiquidToggle(
             }
     }
 
+    // Adapted for iSettings: keep optical glass active during actual state changes,
+    // including taps on the surrounding native preference row, not only finger drag.
+    val transitionLens = remember { Animatable(0f) }
+    var previousSelection by remember { mutableStateOf(selected()) }
+    LaunchedEffect(selected()) {
+        if (previousSelection != selected()) {
+            previousSelection = selected()
+            transitionLens.snapTo(1f)
+            transitionLens.animateTo(0f, tween(620))
+        }
+    }
+    fun lensProgress(): Float = maxOf(dampedDragAnimation.pressProgress,
+        transitionLens.value, if (selected()) 0.28f else 0.08f).coerceIn(0f, 1f)
+
     val trackBackdrop = rememberLayerBackdrop()
 
     Box(
@@ -147,7 +163,7 @@ fun LiquidToggle(
                     backdrop = rememberCombinedBackdrop(
                         backdrop,
                         rememberBackdrop(trackBackdrop) { drawBackdrop ->
-                            val progress = dampedDragAnimation.pressProgress
+                            val progress = lensProgress()
                             val scaleX = lerp(2f / 3f, 0.75f, progress)
                             val scaleY = lerp(0f, 0.75f, progress)
                             scale(scaleX, scaleY) {
@@ -157,16 +173,16 @@ fun LiquidToggle(
                     ),
                     shape = { Capsule() },
                     effects = {
-                        val progress = dampedDragAnimation.pressProgress
-                        blur(8f.dp.toPx() * (1f - progress))
+                        val progress = lensProgress()
+                        blur(3.5f.dp.toPx() * (1f - progress))
                         lens(
                             5f.dp.toPx() * progress,
-                            10f.dp.toPx() * progress,
+                            14f.dp.toPx() * progress,
                             chromaticAberration = true
                         )
                     },
                     highlight = {
-                        val progress = dampedDragAnimation.pressProgress
+                        val progress = lensProgress()
                         Highlight.Ambient.copy(
                             width = Highlight.Ambient.width / 1.5f,
                             blurRadius = Highlight.Ambient.blurRadius / 1.5f,
@@ -180,7 +196,7 @@ fun LiquidToggle(
                         )
                     },
                     innerShadow = {
-                        val progress = dampedDragAnimation.pressProgress
+                        val progress = lensProgress()
                         InnerShadow(
                             radius = 4f.dp * progress,
                             alpha = progress
@@ -194,8 +210,8 @@ fun LiquidToggle(
                         scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
                     },
                     onDrawSurface = {
-                        val progress = dampedDragAnimation.pressProgress
-                        drawRect(Color.White.copy(alpha = 1f - progress))
+                        val progress = lensProgress()
+                        drawRect(Color.White.copy(alpha = 0.88f - progress * 0.52f))
                     }
                 )
                 .size(40f.dp, 24f.dp)

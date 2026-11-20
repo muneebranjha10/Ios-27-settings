@@ -104,13 +104,13 @@ class UpstreamGlassHost private constructor(
                 // Fit the upstream 64 dp toggle in the measured reference slot.
                 BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val widthPx = with(systemDensity) { maxWidth.toPx() }
-                    val fitDensity = (widthPx / 64f).coerceAtLeast(.5f)
+                    val fitDensity = (widthPx / 72f).coerceAtLeast(.5f)
                     CompositionLocalProvider(LocalDensity provides Density(fitDensity, systemDensity.fontScale)) {
                         LiquidToggle(
                             selected = { selected.value },
                             onSelect = { target -> toggleAction?.select(target) },
                             backdrop = backdrop,
-                            modifier = Modifier.size(64.dp, 34.dp)
+                            modifier = Modifier.size(64.dp, 42.dp)
                         )
                     }
                 }
@@ -140,13 +140,13 @@ class UpstreamGlassHost private constructor(
         if (!closed) {
             owner.registry.currentState = Lifecycle.State.RESUMED
             refresh()
-            Entry.log("v0.11 isolated Compose glass attached " + if (isToggle) "toggle" else "search")
+            Entry.log("v0.12 isolated Compose glass attached " + if (isToggle) "toggle" else "search")
         }
     }
     private fun reportFailure(error: Throwable) {
         if (closed || failed) return
         failed = true
-        Entry.log("v0.11 Compose host failure: " + android.util.Log.getStackTraceString(error))
+        Entry.log("v0.12 Compose host failure: " + android.util.Log.getStackTraceString(error))
         android.os.Handler(android.os.Looper.getMainLooper()).post { if (!closed) onFailure.run() }
     }
     override fun onMeasure(w: Int, h: Int) {
