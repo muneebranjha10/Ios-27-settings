@@ -26,3 +26,6 @@ Replaces low-resolution reference masks in rendering with independently drawn na
 
 ## 0.8 reference layout
 See DESIGN_REFERENCE.md. All main homepage geometry now scales from the 754px screenshot, not guessed dp constants. Removed screenshot masks from current source, use crisp independently drawn vectors and reference-style dotted account icon. Fixed row size/spacing and subtle grey search. Retains native Samsung categories rather than adding fake iOS services. Light mode is the design baseline; dark mode remains supported. No claim of pixel-perfect rendering, exact Apple font, full library integration or verified GPU performance.
+
+## 0.9
+Corrects the approximately 15% excess row/font scaling observed on the target device; reference sizing is stable through system font scale 1.2, and grows above that. Uses local top padding instead of subtracting screen offset twice. Reduces search tint opacity from 91% to 38%, increases refraction, and adds a separate bitmap-backed RuntimeShader fallback if RenderNode fails. Logs the chosen render path. Refines independently drawn Wi-Fi, Bluetooth, gear and palette. Original Apple assets are not included. GPU correctness remains unverified; if the glass remains flat, export LSPosed logs before further changes. No complete Kyant Compose integration or pixel perfect claim.
