@@ -2,214 +2,125 @@ package dev.isettings.theme
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas as AndroidCanvas
+import android.content.res.Configuration
+import android.graphics.Color
+import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.AndroidUiDispatcher
-import androidx.compose.ui.platform.ComposeView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeViewModelStoreOwner
-import androidx.savedstate.SavedStateRegistry
-import androidx.savedstate.SavedStateRegistryController
-import androidx.savedstate.SavedStateRegistryOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
-import com.kyant.backdrop.catalog.components.LiquidButton
-import com.kyant.backdrop.catalog.components.LiquidToggle
+import android.widget.LinearLayout
+import android.widget.TextView
+import com.example.liquidglass.LiquidGlassView
+import com.example.liquidglass.LiquidGlassToggle
+import com.example.liquidglass.GlassMaterial
+import kotlin.math.roundToInt
 
 /**
- * Compose bridge for Samsung's native Settings homepage.
- * Uses the actual upstream 2.0.1 catalog composables and published backdrop library.
- * Only the view interop / Android lifecycle / native navigation are new.
+ * Native View bridge to JosephMontfort/Liquid-Glass-on-Android-Views.
+ * No Compose lifecycle or recomposer is used by this host.
  */
 class UpstreamGlassHost private constructor(
     private val activity: Activity,
     private val source: View?,
-    private val backgroundColorInt: Int,
+    private val bg: Int,
     private val dark: Boolean,
     private val isToggle: Boolean,
     initial: Boolean,
-    private val searchAction: Runnable?,
+    private val action: Runnable?,
     private val toggleAction: ToggleAction?,
-    private val onFailure: Runnable
+    private val failure: Runnable
 ) : FrameLayout(activity) {
     fun interface ToggleAction { fun select(value: Boolean) }
-    private val selected = mutableStateOf(initial)
-    private val snapshot = mutableStateOf<Bitmap?>(null, neverEqualPolicy())
-    private val owner = GlassOwner()
-    private val compose: ComposeView
+    private var state = initial
+    private var syncing = false
     private var closed = false
     private var failed = false
-    private val scope = CoroutineScope(AndroidUiDispatcher.CurrentThread + SupervisorJob() + CoroutineExceptionHandler { _, error -> reportFailure(error) })
-    private val recomposer = Recomposer(scope.coroutineContext)
-    private val sample = Runnable { capture() }
-
-    init {
-        owner.controller.performAttach()
-        owner.controller.performRestore(null)
-        owner.registry.currentState = Lifecycle.State.CREATED
-        // The Settings window belongs to another app. Do not use its window recomposer.
-        setViewTreeLifecycleOwner(owner)
-        setViewTreeSavedStateRegistryOwner(owner)
-        setViewTreeViewModelStoreOwner(owner)
-        // Use module resources to prevent Settings' resource IDs from being interpreted
-        // as Compose library resources. The outer FrameLayout still uses host context.
-        val moduleContext = activity.createPackageContext("dev.isettings.theme", Context.CONTEXT_IGNORE_SECURITY)
-        compose = ComposeView(moduleContext)
-        compose.setParentCompositionContext(recomposer)
-        compose.setViewTreeLifecycleOwner(owner)
-        compose.setViewTreeSavedStateRegistryOwner(owner)
-        compose.setViewTreeViewModelStoreOwner(owner)
-        compose.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-        compose.clipChildren = false
-        compose.clipToPadding = false
-        clipChildren = false
-        clipToPadding = false
-        addView(compose, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        scope.launch { recomposer.runRecomposeAndApplyChanges() }
-        compose.setContent {
-            val backdrop = rememberCanvasBackdrop {
-                val image = snapshot.value
-                drawRect(Color(backgroundColorInt))
-                if (image != null) drawImage(image.asImageBitmap())
-            }
-            val systemDensity = LocalDensity.current
-            if (isToggle) {
-                // Fit the upstream 64 dp toggle in the measured reference slot.
-                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    val widthPx = with(systemDensity) { maxWidth.toPx() }
-                    val fitDensity = (widthPx / 72f).coerceAtLeast(.5f)
-                    CompositionLocalProvider(LocalDensity provides Density(fitDensity, systemDensity.fontScale)) {
-                        LiquidToggle(
-                            selected = { selected.value },
-                            onSelect = { target -> toggleAction?.select(target) },
-                            backdrop = backdrop,
-                            modifier = Modifier.size(64.dp, 42.dp)
-                        )
-                    }
-                }
-            } else {
-                val ink = if (dark) Color(0xFFE5E5EA) else Color(0xFF76767B)
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    LiquidButton(
-                        onClick = { searchAction?.run() },
-                        backdrop = backdrop,
-                        modifier = Modifier.fillMaxSize(),
-                        surfaceColor = if (dark) Color(0x4437373B) else Color(0x36F7F7FA)
-                    ) {
-                        Canvas(Modifier.size(20.dp)) {
-                            val stroke = 1.7.dp.toPx()
-                            drawCircle(ink, size.minDimension * .3f, Offset(size.width*.42f,size.height*.42f),
-                                style=androidx.compose.ui.graphics.drawscope.Stroke(stroke))
-                            drawLine(ink,Offset(size.width*.65f,size.height*.65f),Offset(size.width*.9f,size.height*.9f),stroke)
-                        }
-                        BasicText("Search", Modifier.weight(1f), style=TextStyle(color=ink, fontSize=16.sp))
-                    }
-                }
-            }
-        }
-    }
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        if (!closed) {
-            owner.registry.currentState = Lifecycle.State.RESUMED
-            refresh()
-            Entry.log("v0.12 isolated Compose glass attached " + if (isToggle) "toggle" else "search")
-        }
-    }
-    private fun reportFailure(error: Throwable) {
-        if (closed || failed) return
+    private var toggle: LiquidGlassToggle? = null
+    private var search: LiquidGlassView? = null
+    private var configuredWidth = 0
+    init { clipChildren = false; clipToPadding = false }
+    private fun dp(v: Float) = (v * resources.displayMetrics.density).roundToInt()
+    private fun moduleContext(): Context = activity.createPackageContext("dev.isettings.theme", Context.CONTEXT_IGNORE_SECURITY)
+    private fun report(e: Throwable) {
+        if (failed || closed) return
         failed = true
-        Entry.log("v0.12 Compose host failure: " + android.util.Log.getStackTraceString(error))
-        android.os.Handler(android.os.Looper.getMainLooper()).post { if (!closed) onFailure.run() }
+        Entry.log("v0.13 native glass failure: " + android.util.Log.getStackTraceString(e))
+        post { if (!closed) failure.run() }
     }
-    override fun onMeasure(w: Int, h: Int) {
-        try { super.onMeasure(w,h) } catch (e: Exception) {
-            reportFailure(e)
-            setMeasuredDimension(View.MeasureSpec.getSize(w),View.MeasureSpec.getSize(h))
-        } catch (e: LinkageError) {
-            reportFailure(e)
-            setMeasuredDimension(View.MeasureSpec.getSize(w),View.MeasureSpec.getSize(h))
-        }
+    override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+        super.onSizeChanged(w,h,ow,oh)
+        if (w <= 0 || h <= 0 || closed || failed) return
+        // Add the widgets outside onMeasure/onLayout to avoid a layout loop.
+        post { if (!closed && !failed && width > 0 && configuredWidth != width) setup() }
     }
-    override fun onLayout(changed: Boolean,l: Int,t: Int,r: Int,b: Int) {
-        try { super.onLayout(changed,l,t,r,b) } catch (e: Exception) { reportFailure(e) } catch (e: LinkageError) { reportFailure(e) }
-    }
-    override fun dispatchDraw(canvas: AndroidCanvas) {
-        try { super.dispatchDraw(canvas) } catch (e: Exception) { reportFailure(e) } catch (e: LinkageError) { reportFailure(e) }
-    }
-    override fun onDetachedFromWindow() {
-        close()
-        super.onDetachedFromWindow()
-    }
-    override fun onSizeChanged(w: Int,h: Int,ow: Int,oh: Int) {
-        super.onSizeChanged(w,h,ow,oh);refresh()
-    }
-    fun refresh() {
-        if (closed || source == null) return
-        removeCallbacks(sample)
-        postOnAnimation(sample)
-    }
-    private fun capture() {
-        if (closed || source == null || width <= 0 || height <= 0) return
+    private fun setup() {
         try {
-            val bitmap = Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888)
-            val canvas = AndroidCanvas(bitmap)
-            canvas.drawColor(backgroundColorInt)
-            val from=IntArray(2);val to=IntArray(2)
-            source.getLocationOnScreen(from);getLocationOnScreen(to)
-            canvas.translate((from[0]-to[0]).toFloat(),(from[1]-to[1]).toFloat())
-            source.draw(canvas)
-            snapshot.value=bitmap
-        } catch (e: Throwable) { Entry.log("upstream backdrop capture failed " + e) }
+            if (closed || failed || width <= 0) return
+            configuredWidth = width
+            removeAllViews()
+            val module = moduleContext()
+            if (isToggle) {
+                val cfg = Configuration(module.resources.configuration)
+                cfg.densityDpi = (width * 160f / 76f).roundToInt().coerceIn(120, 1000)
+                val fit = module.createConfigurationContext(cfg)
+                val widget = LiquidGlassToggle(fit)
+                widget.accentColor = if(dark) 0xFF30D158.toInt() else 0xFF34C759.toInt()
+                widget.trackColor = if(dark) 0xFF57575B.toInt() else 0xFFC5C6C8.toInt()
+                widget.setChecked(state, false)
+                widget.contentDescription = "Switch"
+                widget.onCheckedChangeListener = { checked ->
+                    if (!closed && !syncing) toggleAction?.select(checked)
+                }
+                toggle = widget
+                addView(widget, LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT,Gravity.CENTER))
+            } else {
+                val widget = LiquidGlassView(module)
+                widget.material = GlassMaterial.CLEAR
+                widget.cornerRadius = height / 2f
+                widget.bevelWidth = dp(9f).toFloat()
+                widget.refractionHeight = dp(23f).toFloat()
+                widget.dispersionStrength = .18f
+                widget.blurAmount = .045f
+                widget.saturation = 145f
+                widget.enableSensorHighlight = false
+                widget.enableDynamicBackground = false
+                widget.enableAdaptiveTint = false
+                widget.setGlassTint(if (dark) 0xFF242428.toInt() else Color.WHITE, .12f)
+                widget.backdropSource = source
+                val ink = if (dark) 0xFFF0F0F5.toInt() else 0xFF55555B.toInt()
+                val labels = LinearLayout(activity)
+                labels.gravity = Gravity.CENTER_VERTICAL
+                labels.setPadding(dp(15f), 0, dp(15f), 0)
+                labels.addView(Entry.Glyph(activity, "search", ink, ink, false, dark),LinearLayout.LayoutParams(dp(22f),dp(22f)))
+                val label=TextView(activity)
+                label.text="Search"
+                label.setTextColor(ink)
+                label.textSize=16f
+                val lp=LinearLayout.LayoutParams(0,-2,1f)
+                lp.leftMargin=dp(8f)
+                labels.addView(label,lp)
+                widget.addView(labels,FrameLayout.LayoutParams(-1,-1))
+                widget.setOnClickListener { action?.run() }
+                widget.contentDescription="Search Samsung Settings"
+                search=widget
+                addView(widget,LayoutParams(-1,-1))
+            }
+            Entry.log("v0.13 native glass component mounted: " + if (isToggle) "toggle" else "search")
+        } catch(e: Throwable) { report(e) }
     }
-    fun confirm(value: Boolean) { selected.value=value }
-    fun close() {
-        if (closed) return
-        closed=true;removeCallbacks(sample);snapshot.value=null
-        runCatching { compose.disposeComposition() }
-        runCatching { recomposer.cancel() }
-        scope.cancel()
-        runCatching { owner.registry.currentState=Lifecycle.State.DESTROYED }
-        runCatching { owner.viewModelStore.clear() }
+    override fun dispatchDraw(canvas: android.graphics.Canvas) {
+        try { super.dispatchDraw(canvas) } catch(e: Exception) { report(e) } catch(e: LinkageError) { report(e) }
     }
-    private class GlassOwner : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
-        val registry=LifecycleRegistry(this)
-        val controller=SavedStateRegistryController.create(this)
-        override val lifecycle: Lifecycle get()=registry
-        override val savedStateRegistry: SavedStateRegistry get()=controller.savedStateRegistry
-        override val viewModelStore=ViewModelStore()
+    fun refresh() { if (!closed) search?.invalidate() }
+    fun confirm(value: Boolean) {
+        state=value
+        syncing=true
+        try { toggle?.setChecked(value,true) } catch(e: Throwable) { report(e) } finally { syncing=false }
     }
+    fun close() { if(closed)return;closed=true;toggle?.onCheckedChangeListener=null;search?.backdropSource=null;removeAllViews();toggle=null;search=null }
     companion object {
-        @JvmStatic fun search(activity: Activity, source: View, bg: Int, dark: Boolean, action: Runnable, failure: Runnable)=
+        @JvmStatic fun search(activity: Activity,source: View,bg: Int,dark: Boolean,action: Runnable,failure: Runnable)=
             UpstreamGlassHost(activity,source,bg,dark,false,false,action,null,failure)
-        @JvmStatic fun toggle(activity: Activity, bg: Int, dark: Boolean, initial: Boolean, action: ToggleAction, failure: Runnable)=
+        @JvmStatic fun toggle(activity: Activity,bg: Int,dark: Boolean,initial: Boolean,action: ToggleAction,failure: Runnable)=
             UpstreamGlassHost(activity,null,bg,dark,true,initial,null,action,failure)
     }
 }

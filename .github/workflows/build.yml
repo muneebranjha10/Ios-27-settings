@@ -1,7 +1,7 @@
 name: Build experimental APK
 on:
   push:
-    branches: [main, upstream-glass]
+    branches: [main, upstream-glass, native-glass-research]
   workflow_dispatch:
 permissions:
   contents: read
@@ -39,6 +39,15 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/icon-venv"
           "$RUNNER_TEMP/icon-venv/bin/pip" install cairosvg==2.7.1
           "$RUNNER_TEMP/icon-venv/bin/python" scripts/generate_icons.py "$RUNNER_TEMP/icon-source/package"
+      - name: Check out MIT-licensed native renderer at reviewed revision
+        uses: actions/checkout@v4
+        with:
+          repository: JosephMontfort/Liquid-Glass-on-Android-Views
+          ref: a44972cf649dd8fae7fb819afcaa088405b20399
+          path: .vendor/nativeglass
+          persist-credentials: false
+      - name: Prepare pinned native glass sources
+        run: python3 scripts/import_native_glass.py .vendor/nativeglass
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.7.1'

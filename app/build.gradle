@@ -3,12 +3,13 @@ android {
  namespace 'dev.isettings.theme'
  compileSdk 37
  buildToolsVersion '37.0.0'
- defaultConfig { applicationId 'dev.isettings.theme'; minSdk 31; targetSdk 32; versionCode 12; versionName '0.12-wifi-glass' }
+ defaultConfig { applicationId 'dev.isettings.theme'; minSdk 31; targetSdk 32; versionCode 13; versionName '0.13-native-research' }
  buildFeatures { compose true }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
  packaging { resources { excludes += ['DebugProbesKt.bin','kotlin-tooling-metadata.json','META-INF/*.version','META-INF/**/LICENSE.txt'] } }
 }
 dependencies {
+ implementation project(':nativeglass')
  compileOnly 'de.robv.android.xposed:api:82'
  implementation 'io.github.kyant0:backdrop:2.0.1'
  implementation 'io.github.kyant0:shapes:1.2.1'
